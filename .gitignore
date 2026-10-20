@@ -50,3 +50,4 @@ temp/
 
 # Bundled Windows ConPTY, fetched by scripts/ensure-windows-conpty.cjs
 apps/desktop-tauri/src-tauri/resources/conpty/
+logs/
