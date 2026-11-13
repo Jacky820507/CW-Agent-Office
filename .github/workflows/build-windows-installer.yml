@@ -4,6 +4,10 @@ name: build-windows-installer
 # Unlike `release`, it publishes nothing and needs no tag or signing keys, so
 # a branch can be built and downloaded without Rust or Visual Studio locally.
 on:
+  # GitHub only registers manually-dispatched workflows that exist on the
+  # default branch, so the feature branch also builds on every push.
+  push:
+    branches: [feat/code-bot]
   workflow_dispatch:
 
 permissions:
