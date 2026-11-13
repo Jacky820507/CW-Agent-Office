@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -81,7 +82,16 @@ interface AgentCanvasPaneProps {
   /** Forwarded straight through to `useAgentCanvasData`'s `refreshSignal` —
    * see that hook's doc comment. */
   refreshSignal?: number
+  /** Fired after this pane created or changed agents outside the normal
+   * create-agent UI (the Code Bot team button), so the caller can reload
+   * anything else that lists agents, such as the station list. */
+  onAgentsChanged?: () => void | Promise<void>
 }
+
+type CodeBotSetupState =
+  | { phase: 'idle' }
+  | { phase: 'working' }
+  | { phase: 'done'; messageKey: TranslationKey }
 
 interface WireDragState {
   pointerId: number
@@ -257,6 +267,7 @@ export function AgentCanvasPane({
   onRequestCreateSubagent,
   onRequestEditAgent,
   refreshSignal,
+  onAgentsChanged,
 }: AgentCanvasPaneProps) {
   const {
     graph,
@@ -273,6 +284,7 @@ export function AgentCanvasPane({
     deleteDerivedLink,
     removeInstancesFromCanvas,
     addInstance,
+    ensureAgentsOnCanvas,
     setAgentColor,
     setLinkColor,
     setLinkBidirectional,
@@ -280,6 +292,44 @@ export function AgentCanvasPane({
     beginHistoryBatch,
     endHistoryBatch,
   } = useAgentCanvasData(workspaceId, active, refreshSignal)
+  const [codeBotSetup, setCodeBotSetup] = useState<CodeBotSetupState>({ phase: 'idle' })
+  const workspaceIdRef = useRef(workspaceId)
+  useLayoutEffect(() => {
+    workspaceIdRef.current = workspaceId
+  }, [workspaceId])
+  const handleSetupCodeBotTeam = useCallback(async () => {
+    if (!workspaceId || codeBotSetup.phase === 'working') return
+    setCodeBotSetup({ phase: 'working' })
+    try {
+      const team = await desktopApi.codeBotEnsureTeam(workspaceId)
+      // The user may have switched workspace while this ran; placing the
+      // team on the now-current canvas would mix two workspaces' layouts.
+      if (workspaceIdRef.current !== workspaceId) {
+        setCodeBotSetup({ phase: 'idle' })
+        return
+      }
+      ensureAgentsOnCanvas([team.claudeAgentId, team.codexAgentId])
+      await onAgentsChanged?.()
+      setCodeBotSetup({
+        phase: 'done',
+        messageKey: team.createdAgentIds.length > 0 ? 'agentCanvas.codeBot.created' : 'agentCanvas.codeBot.alreadyReady',
+      })
+    } catch (error) {
+      setCodeBotSetup({ phase: 'idle' })
+      window.alert(`${t(locale, 'agentCanvas.codeBot.failed')}: ${String(error)}`)
+    }
+  }, [workspaceId, codeBotSetup.phase, ensureAgentsOnCanvas, onAgentsChanged, locale])
+  useEffect(() => {
+    if (codeBotSetup.phase !== 'done') return
+    const timer = window.setTimeout(() => setCodeBotSetup({ phase: 'idle' }), 4000)
+    return () => window.clearTimeout(timer)
+  }, [codeBotSetup])
+  const codeBotStatusMessage =
+    codeBotSetup.phase === 'done' ? (
+      <div className="agent-canvas-codebot-status" role="status">
+        {t(locale, codeBotSetup.messageKey)}
+      </div>
+    ) : null
   const [wireDrag, setWireDrag] = useState<WireDragState | null>(null)
   const [nodeContextMenu, setNodeContextMenu] = useState<NodeContextMenuState | null>(null)
   const [wireContextMenu, setWireContextMenu] = useState<WireContextMenuState | null>(null)
@@ -1001,7 +1051,18 @@ export function AgentCanvasPane({
         <div className="agent-canvas-empty">
           <AppIcon name="route" aria-hidden="true" />
           <p>{t(locale, 'agentCanvas.empty')}</p>
+          <button
+            type="button"
+            className="agent-canvas-codebot-cta"
+            onClick={() => void handleSetupCodeBotTeam()}
+            disabled={!workspaceId || codeBotSetup.phase === 'working'}
+          >
+            <AppIcon name="sparkles" aria-hidden="true" />
+            {t(locale, codeBotSetup.phase === 'working' ? 'agentCanvas.codeBot.working' : 'agentCanvas.codeBot.setup')}
+          </button>
+          <p className="agent-canvas-codebot-hint">{t(locale, 'agentCanvas.codeBot.setupHint')}</p>
         </div>
+        {codeBotStatusMessage}
       </div>
     )
   }
@@ -1317,6 +1378,19 @@ export function AgentCanvasPane({
       {(zoomApi) => (
         <>
           <div className="agent-canvas-notice">{t(locale, 'agentCanvas.notice.edgeRequired')}</div>
+          <button
+            type="button"
+            className="agent-canvas-codebot-button"
+            onClick={() => void handleSetupCodeBotTeam()}
+            disabled={!workspaceId || codeBotSetup.phase === 'working'}
+            title={t(locale, 'agentCanvas.codeBot.setupHint')}
+          >
+            <AppIcon name="sparkles" aria-hidden="true" />
+            <span>
+              {t(locale, codeBotSetup.phase === 'working' ? 'agentCanvas.codeBot.working' : 'agentCanvas.codeBot.setup')}
+            </span>
+          </button>
+          {codeBotStatusMessage}
           <button
             type="button"
             className="agent-canvas-help-button"

@@ -222,6 +222,17 @@ pub fn task_dispatch_batch(
     )
     .map_err(|error| format!("{}: {}", error.code, error.message))?;
 
+    if request.sender.sender_type == gt_task::DispatchSenderType::Human
+        && gt_agent::is_code_bot_traffic(None, &request.targets)
+    {
+        // A user message starts a fresh hand-off budget for the Code Bot
+        // loop guard (docs/cw/22_Code_Bot規劃.md, P3).
+        let snapshot = state
+            .collaboration_guard
+            .record_human_dispatch(&request.workspace_id);
+        let _ = app.emit("code_bot/collaboration_guard", &snapshot);
+    }
+
     let workspace_root = state.workspace_root_path(&request.workspace_id)?;
     // `suppress_output_collection_instructions` is a per-send override from
     // Task Brief's checkbox — it must never touch the target's own

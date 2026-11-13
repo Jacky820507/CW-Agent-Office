@@ -73,6 +73,19 @@ function saveInstances(workspaceId: string, instances: CanvasNodeInstance[]): vo
   }
 }
 
+/** For agents created outside the canvas while it isn't open (the Code Bot
+ * tab's team setup, docs/cw/22_Code_Bot規劃.md): gives each its default
+ * instance so it appears on the canvas next time instead of in the standby
+ * rail. A workspace whose canvas was never opened is left alone — its
+ * first load seeds every agent anyway. */
+export function placeAgentsOnStoredCanvas(workspaceId: string, agentIds: string[]): void {
+  const instances = loadInstancesOrNull(workspaceId)
+  if (instances === null) return
+  const missing = agentIds.filter((agentId) => !instances.some((instance) => instance.agentId === agentId))
+  if (missing.length === 0) return
+  saveInstances(workspaceId, [...instances, ...missing.map((agentId) => ({ instanceId: agentId, agentId }))])
+}
+
 /** Whether an agent has a real, backend-persisted canvas layout position —
  * shared by every undo entry below that needs to know what to revert an
  * agent's position back to (or that there's nothing to revert to). */
@@ -214,6 +227,8 @@ interface UseAgentCanvasDataResult {
    * creates two independent, purely-visual nodes (docs/cw/04_客製化設計.md
    * §8, P4.6). */
   addInstance: (agentId: string, position: { x: number; y: number }) => void
+  /** Gives each listed agent its default instance if it has none yet. */
+  ensureAgentsOnCanvas: (agentIds: string[]) => void
   /** Sets the node border color for one or more agents (batch, for a
    * multi-node selection) — backend-persisted (docs/cw/04_客製化設計.md §1,
    * P4.6). `color: null` resets to the default gray. Per-agent, not
@@ -872,6 +887,24 @@ export function useAgentCanvasData(
     [workspaceId, capabilityByAgentId, pushHistory, enqueueWrite],
   )
 
+  /** Puts each agent's default instance on canvas unless it already has one —
+   * used after agents are created outside the canvas (e.g. the Code Bot team,
+   * docs/cw/22_Code_Bot規劃.md) so they don't land in the standby rail. Uses
+   * the agent's persisted layout, so it takes no position argument. */
+  const ensureAgentsOnCanvas = useCallback(
+    (agentIds: string[]) => {
+      if (!workspaceId) return
+      // Persist outside the state updater: updaters must stay pure (React may
+      // run them twice), and this keeps the write tied to this workspace id.
+      const missing = agentIds.filter((agentId) => !instances.some((instance) => instance.agentId === agentId))
+      if (missing.length === 0) return
+      const next = [...instances, ...missing.map((agentId) => ({ instanceId: agentId, agentId }))]
+      setInstances(next)
+      saveInstances(workspaceId, next)
+    },
+    [workspaceId, instances],
+  )
+
   const addInstance = useCallback(
     (agentId: string, position: { x: number; y: number }) => {
       if (!workspaceId) return
@@ -1124,6 +1157,7 @@ export function useAgentCanvasData(
     deleteDerivedLink,
     removeInstancesFromCanvas,
     addInstance,
+    ensureAgentsOnCanvas,
     setAgentColor,
     setLinkColor,
     setLinkBidirectional,

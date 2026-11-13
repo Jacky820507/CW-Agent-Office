@@ -107,6 +107,15 @@ Agent B（Station 2）
 
 `gto` 協議背後對應的領域邏輯主要在 `crates/gt-task`（任務派發、進度事件、Agent runtime 註冊）和 `crates/gt-agent`（Agent 身分與角色）。前端 `features/task-center` 提供任務追蹤/派工的 UI。
 
+### Code Bot：建在 `gto` 協議之上的對話介面（2026-11-12）
+
+Code Bot（`features/code-bot` ↔ `commands/code_bot`）沒有另外發明新的協作協議，而是把既有的 `gto` 協議包成一條對話串，細節見 `docs/cw/22_Code_Bot規劃.md`：
+
+- **你 → agent**：走既有的人類派工 `task_dispatch_batch`。訊息末尾會附一段指示，請 agent 完成後執行 `gto agent reply-status --target-agent-id <自己>` 回報，多行內容可以用 `--detail-file`。
+- **agent → 你**：發給自己的 status 不需要畫布連線，而且只會被儲存並推送事件，不會打進終端，前端收到後就顯示成對話泡泡。
+- **agent ↔ agent**：仍然是 `gto agent send-task`。bridge 多加了一道 Code Bot 專用的迴圈防護（`crates/gt-task/src/collaboration_guard.rs`），只限制 `codebot-claude`／`codebot-codex` 之間的派工；其他 agent 不受影響。
+- **儲存**：人類訊息本來就不在後端的 channel 存放區裡，所以對話串存在 localStorage 加上 SQLite 的 `code_bot_threads` 表。
+
 ## 3. Agent 輸出怎麼被觀察：Display Channel vs Data Channel
 
 一個 Agent 進程的輸出，同時走兩條路：

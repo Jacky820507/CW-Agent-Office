@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { AgentCanvasPane, AgentCanvasStandbyRail } from '@features/agent-canvas'
 import { BusinessDesignerPane } from '@features/business-designer'
+import { CodeBotPane } from '@features/code-bot'
 import { FileEditorPane, FileTreePane, GlobalFileSearchModal } from '@features/file-explorer'
 import { GitHistoryPane, GitOperationsPane } from '@features/git'
 import { GlobalTaskDispatchOverlay, TaskCenterPane } from '@features/task-center'
@@ -75,6 +76,7 @@ interface ShellRootViewProps {
   communicationChannelsPaneProps: ComponentProps<typeof CommunicationChannelsPane>
   businessDesignerPaneProps: ComponentProps<typeof BusinessDesignerPane>
   agentCanvasPaneProps: ComponentProps<typeof AgentCanvasPane>
+  codeBotPaneProps: ComponentProps<typeof CodeBotPane>
   agentCanvasStandbyRailProps: ComponentProps<typeof AgentCanvasStandbyRail>
   activePaneModel: PaneModel
   showWorkbenchCanvas: boolean
@@ -265,6 +267,11 @@ function ShellMainPaneContent({
     )
   }
 
+  if (activeNavId === 'code-bot') {
+    // Rendered by ShellWorkspaceContent, which keeps it mounted across tabs.
+    return null
+  }
+
   return <div key="empty" className="shell-feature-view shell-pane-transition" />
 }
 
@@ -276,6 +283,7 @@ interface ShellWorkspaceContentProps {
   gitHistoryPaneProps: ComponentProps<typeof GitHistoryPane>
   businessDesignerPaneProps: ComponentProps<typeof BusinessDesignerPane>
   agentCanvasPaneProps: ComponentProps<typeof AgentCanvasPane>
+  codeBotPaneProps: ComponentProps<typeof CodeBotPane>
 }
 
 function ShellWorkspaceContent({
@@ -286,6 +294,7 @@ function ShellWorkspaceContent({
   gitHistoryPaneProps,
   businessDesignerPaneProps,
   agentCanvasPaneProps,
+  codeBotPaneProps,
 }: ShellWorkspaceContentProps) {
   return (
     <div className="shell-pane-shell shell-main-pane">
@@ -298,6 +307,16 @@ function ShellWorkspaceContent({
         businessDesignerPaneProps={businessDesignerPaneProps}
         agentCanvasPaneProps={agentCanvasPaneProps}
       />
+      {/* Kept mounted while hidden: an in-flight send (launching an agent can
+          take ~30s) or a reply arriving off-screen must not be lost when the
+          user switches tabs. */}
+      <div
+        className="shell-feature-view shell-pane-transition"
+        style={activeNavId === 'code-bot' && !showWorkbenchCanvas ? undefined : { display: 'none' }}
+        aria-hidden={activeNavId !== 'code-bot'}
+      >
+        <CodeBotPane {...codeBotPaneProps} />
+      </div>
     </div>
   )
 }
@@ -317,6 +336,7 @@ interface ShellMainAreaProps {
   gitHistoryPaneProps: ComponentProps<typeof GitHistoryPane>
   businessDesignerPaneProps: ComponentProps<typeof BusinessDesignerPane>
   agentCanvasPaneProps: ComponentProps<typeof AgentCanvasPane>
+  codeBotPaneProps: ComponentProps<typeof CodeBotPane>
 }
 
 function ShellMainArea({
@@ -334,6 +354,7 @@ function ShellMainArea({
   gitHistoryPaneProps,
   businessDesignerPaneProps,
   agentCanvasPaneProps,
+  codeBotPaneProps,
 }: ShellMainAreaProps) {
   return (
     <div ref={shellMainPaneRef} className="shell-main-content">
@@ -345,6 +366,7 @@ function ShellMainArea({
         gitHistoryPaneProps={gitHistoryPaneProps}
         businessDesignerPaneProps={businessDesignerPaneProps}
         agentCanvasPaneProps={agentCanvasPaneProps}
+        codeBotPaneProps={codeBotPaneProps}
       />
       {pinnedWorkbenchCanvasProps ? (
         <div
@@ -394,6 +416,7 @@ interface ShellMainLayoutProps {
   gitHistoryPaneProps: ComponentProps<typeof GitHistoryPane>
   businessDesignerPaneProps: ComponentProps<typeof BusinessDesignerPane>
   agentCanvasPaneProps: ComponentProps<typeof AgentCanvasPane>
+  codeBotPaneProps: ComponentProps<typeof CodeBotPane>
   agentCanvasStandbyRailProps: ComponentProps<typeof AgentCanvasStandbyRail>
 }
 
@@ -421,6 +444,7 @@ function ShellMainLayout({
   communicationChannelsPaneProps,
   businessDesignerPaneProps,
   agentCanvasPaneProps,
+  codeBotPaneProps,
   agentCanvasStandbyRailProps,
   activePaneModel,
   showWorkbenchCanvas,
@@ -429,7 +453,8 @@ function ShellMainLayout({
   fileEditorPaneProps,
   gitHistoryPaneProps,
 }: ShellMainLayoutProps) {
-  const usesIntegratedLeftPane = activeNavId === 'designer' || activeNavId === 'stations'
+  const usesIntegratedLeftPane =
+    activeNavId === 'designer' || activeNavId === 'stations' || activeNavId === 'code-bot'
 
   return (
     <>
@@ -485,6 +510,7 @@ function ShellMainLayout({
         gitHistoryPaneProps={gitHistoryPaneProps}
         businessDesignerPaneProps={businessDesignerPaneProps}
         agentCanvasPaneProps={agentCanvasPaneProps}
+        codeBotPaneProps={codeBotPaneProps}
       />
       {pinnedWorkbenchCanvasProps ? (
         <div className="shell-pane-shell shell-right-pane">
@@ -559,6 +585,7 @@ export function ShellRootView({
   communicationChannelsPaneProps,
   businessDesignerPaneProps,
   agentCanvasPaneProps,
+  codeBotPaneProps,
   agentCanvasStandbyRailProps,
   activePaneModel,
   showWorkbenchCanvas,
@@ -646,6 +673,7 @@ export function ShellRootView({
           communicationChannelsPaneProps={communicationChannelsPaneProps}
           businessDesignerPaneProps={businessDesignerPaneProps}
           agentCanvasPaneProps={agentCanvasPaneProps}
+          codeBotPaneProps={codeBotPaneProps}
           agentCanvasStandbyRailProps={agentCanvasStandbyRailProps}
           activePaneModel={activePaneModel}
           showWorkbenchCanvas={showWorkbenchCanvas}

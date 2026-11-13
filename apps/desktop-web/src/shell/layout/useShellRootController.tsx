@@ -75,6 +75,7 @@ import { ShellRootView } from './ShellRootView'
 import { WorkspaceCloseDialog } from './WorkspaceCloseDialog'
 import { pickDirectory } from '../integration/directory-picker'
 import type { SessionRelaunchRequest } from '@features/session'
+import { useCodeBotReplyNotifier } from '@features/code-bot'
 
 interface ShellRootProps {
   workspaceWindowId?: string
@@ -362,6 +363,7 @@ export function useShellRootController({ workspaceWindowId }: ShellRootProps = {
     stationAgentRunningById,
     batchLaunchableAgentCount,
     writeStationTerminalWithSubmit,
+    sendStationTerminalInput,
   } = terminalController
   const deleteCleanupSubmitting = stationDeleteCleanupSubmitting
   const taskDispatchController = useShellTaskDispatchController({
@@ -392,6 +394,7 @@ export function useShellRootController({ workspaceWindowId }: ShellRootProps = {
     insertTaskSnippet,
     handleTaskSend,
     handleRetryDispatchTask,
+    dispatchTaskBatch,
   } = taskDispatchController
   const {
     openedFiles,
@@ -528,6 +531,8 @@ export function useShellRootController({ workspaceWindowId }: ShellRootProps = {
     handleMergeWorkspaceTab,
     handlePickWorkspaceDirectory,
   } = workspaceSessionController
+
+  useCodeBotReplyNotifier(locale, presentedWorkspaceId, activeNavId === 'code-bot')
 
   const presentedWorkspaceRoot = useMemo(() => {
     if (!presentedWorkspaceId) {
@@ -1168,7 +1173,8 @@ export function useShellRootController({ workspaceWindowId }: ShellRootProps = {
     activeNavId !== 'files' &&
     activeNavId !== 'git' &&
     activeNavId !== 'designer' &&
-    activeNavId !== 'agent-canvas'
+    activeNavId !== 'agent-canvas' &&
+    activeNavId !== 'code-bot'
   const showPinnedWorkbenchPane =
     Boolean(pinnedWorkbenchContainer) &&
     (activeNavId === 'files' || activeNavId === 'git' || unpinnedWorkbenchContainers.length > 0)
@@ -1501,6 +1507,28 @@ export function useShellRootController({ workspaceWindowId }: ShellRootProps = {
       onRequestCreateSubagent: handleAgentCanvasRequestNewSubagent,
       onRequestEditAgent: handleAgentCanvasRequestEditAgent,
       refreshSignal: agentCanvasRefreshTick,
+      onAgentsChanged: async () => {
+        if (presentedWorkspaceId) {
+          await loadStationsFromDatabase(presentedWorkspaceId)
+        }
+        setAgentCanvasRefreshTick((tick) => tick + 1)
+      },
+    },
+    codeBotPaneProps: {
+      locale,
+      workspaceId: presentedWorkspaceId,
+      active: activeNavId === 'code-bot',
+      onLaunchAgent: launchStationCliAgent,
+      onDispatch: dispatchTaskBatch,
+      onOpenAgentTerminal: handleStationSearchSelectStation,
+      // Esc is the interrupt key in both Claude Code and Codex TUIs.
+      onInterruptAgent: (agentId: string) => sendStationTerminalInput(agentId, '\x1b'),
+      onAgentsChanged: async () => {
+        if (presentedWorkspaceId) {
+          await loadStationsFromDatabase(presentedWorkspaceId)
+        }
+        setAgentCanvasRefreshTick((tick) => tick + 1)
+      },
     },
     agentCanvasStandbyRailProps: {
       locale,

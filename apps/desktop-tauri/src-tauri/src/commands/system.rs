@@ -18,6 +18,18 @@ pub fn system_signal_ui_ready(
     Ok(())
 }
 
+/// CPU / memory / GPU reading for the Code Bot dashboard
+/// (docs/cw/22_Code_Bot規劃.md, P4). Unsupported values come back as null.
+/// Async so the occasional `nvidia-smi` spawn never blocks the main thread.
+#[tauri::command]
+pub async fn system_metrics_snapshot() -> Result<Value, String> {
+    let snapshot =
+        tauri::async_runtime::spawn_blocking(|| crate::system_metrics::shared_sampler().sample())
+            .await
+            .map_err(|error| error.to_string())?;
+    serde_json::to_value(snapshot).map_err(|error| error.to_string())
+}
+
 /// Whether the Tauri shell applied native window vibrancy during setup.
 ///
 /// The frontend uses this to switch its base background to transparent so the
@@ -51,6 +63,8 @@ pub struct GtoCliStatusResponse {
 pub struct GtoSkillStatusResponse {
     pub installed: bool,
     pub managed: bool,
+    /// Managed install whose SKILL.md differs from the bundled version.
+    pub outdated: bool,
     pub target_dir: Option<String>,
     pub source_dir: Option<String>,
     pub install_available: bool,
@@ -253,9 +267,17 @@ pub fn system_gto_skill_status(
     let source_dir = resolve_gto_skill_source_dir(&app);
     let installed = target_dir.join("SKILL.md").is_file();
     let managed = installed && skill_is_managed(&target_dir);
+    // A GT Office-managed copy whose SKILL.md differs from the bundled one
+    // predates an app update (e.g. the Code Bot reply section); reinstalling
+    // refreshes it. Externally installed skills are never flagged.
+    let outdated = managed
+        && source_dir.as_ref().is_some_and(|source| {
+            fs::read(source.join("SKILL.md")).ok() != fs::read(target_dir.join("SKILL.md")).ok()
+        });
     Ok(GtoSkillStatusResponse {
         installed,
         managed,
+        outdated,
         target_dir: Some(target_dir.display().to_string()),
         source_dir: source_dir.as_ref().map(|path| path.display().to_string()),
         install_available: source_dir.is_some(),

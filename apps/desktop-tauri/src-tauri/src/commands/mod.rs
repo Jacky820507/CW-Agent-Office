@@ -2,6 +2,7 @@ pub mod agent;
 pub mod agent_canvas;
 pub mod agentic_one;
 pub mod business_designer;
+pub mod code_bot;
 pub mod file_explorer;
 pub mod git;
 pub mod keybindings;

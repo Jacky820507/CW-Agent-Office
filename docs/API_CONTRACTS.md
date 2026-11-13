@@ -232,6 +232,23 @@ skips shell rc files for a fast cold start. Calls that depend on shell profile s
 | `business_designer.preview_coding_handoff` | `workspaceId, documentId` | `preview` |
 | `business_designer.dispatch_coding_handoff` | `workspaceId, documentId` | `taskId` |
 
+### Code Bot (docs/cw/22_Code_Bot規劃.md)
+
+| Command | Key Request Fields | Key Response Fields |
+|---------|-------------------|-------------------|
+| `code_bot_ensure_team` | `workspaceId` | `claudeAgentId, codexAgentId, createdAgentIds[]` — idempotent; fixed ids `codebot-claude` / `codebot-codex`, one authored edge (bidirectional display) |
+| `code_bot_collaboration_state` | `workspaceId` | `CollaborationGuardSnapshot { workspaceId, paused, agentHops, hopLimit, hopLimitReached }` |
+| `code_bot_set_collaboration_paused` | `workspaceId, paused` | `CollaborationGuardSnapshot` — resuming also resets `agentHops` |
+| `code_bot_set_hop_limit` | `workspaceId, limit` | `CollaborationGuardSnapshot` — limit clamped to 1–20, in-memory (frontend re-applies the saved choice after restart) |
+| `code_bot_thread_load` | `workspaceId` | `{ humanItems, agentItems, clearedAtMs, updatedAtMs }` — lists are `null` when nothing was saved; items are frontend-owned JSON |
+| `code_bot_thread_save` | `workspaceId, humanItems[], agentItems[], clearedAtMs` | `{ updatedAtMs }` — replaces the workspace row in `code_bot_threads`; each list must be a JSON array ≤ 4 MiB |
+| `system_metrics_snapshot` | — | `{ cpuPercent, memoryUsedBytes, memoryTotalBytes, gpu: { name, utilizationPercent, memoryUsedBytes, memoryTotalBytes, temperatureC } }`; unsupported values are `null`, `cpuPercent` is `null` on the first call |
+
+Thread replies: a Code Bot dispatch asks the agent to report with
+`gto agent reply-status --target-agent-id <itself>`. Self-addressed status
+messages need no canvas edge, are only stored/emitted (never typed into a
+terminal), and do not record a derived canvas link.
+
 ## Event Contracts
 
 Events are broadcast from the backend to all subscribed frontend listeners. Workspace-scoped events include `workspaceId` so listeners can reject stale events before mutating active UI state.
@@ -246,6 +263,7 @@ Events are broadcast from the backend to all subscribed frontend listeners. Work
 | `terminal/meta` | `{ workspaceId, sessionId, unreadBytes, unreadChunks, tailChunk, tsMs }` | Hidden terminal produced summarized output |
 | `gtoffice:git-status-changed` | `{ workspaceId }` | Git status needs refresh |
 | `gtoffice:ui-preferences-updated` | `{ preferences }` | UI preferences changed |
+| `code_bot/collaboration_guard` | `CollaborationGuardSnapshot` | An agent hand-off was counted or refused, a human dispatch reset the count, or collaboration was paused/resumed |
 
 ## Shared Types
 
@@ -280,6 +298,8 @@ Key shared type categories:
 | Code | Description |
 |------|-------------|
 | `AGENT_OFFLINE` | Target agent is not connected |
+| `AGENT_COLLAB_PAUSED` | The user paused agent-to-agent hand-offs in this workspace (Code Bot) |
+| `AGENT_COLLAB_HOP_LIMIT` | Agents already handed work off the maximum number of times since the user's last message (Code Bot loop guard, default 6) |
 | `AGENT_INSTALL_FAILED` | Agent installation failed |
 | `MCP_INVALID_PARAMS` | MCP request has invalid parameters |
 | `MCP_BRIDGE_UNAVAILABLE` | MCP bridge is not available |

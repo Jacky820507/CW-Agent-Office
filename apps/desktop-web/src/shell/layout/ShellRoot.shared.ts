@@ -271,6 +271,7 @@ const NAV_ITEM_ID_SET = new Set<NavItemId>([
   'tasks',
   'files',
   'designer',
+  'code-bot',
   'git',
   'hooks',
   'channels',

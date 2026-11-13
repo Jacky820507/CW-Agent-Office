@@ -743,7 +743,59 @@ fn record_derived_links(
         let Some(from_agent_id) = event.sender_agent_id.as_deref() else {
             continue;
         };
+        // Code Bot agents report replies to themselves (docs/cw/22_Code_Bot規劃.md,
+        // P2) so the reply lands in the shared thread; that is not a real
+        // agent-to-agent interaction and must not draw a self-loop on canvas.
+        if from_agent_id == event.target_agent_id {
+            continue;
+        }
         let _ = repo.record_derived_link(workspace_id, from_agent_id, &event.target_agent_id);
+    }
+}
+
+/// Code Bot loop guard (docs/cw/22_Code_Bot規劃.md, P3): an agent handing work
+/// to another agent counts one hop; past the limit, or while the user has
+/// paused collaboration, the dispatch is refused with a message the agent
+/// can act on. Human senders and an agent messaging only itself pass.
+fn admit_agent_dispatch_through_guard(
+    app: &AppHandle,
+    state: &AppState,
+    request: &TaskDispatchBatchRequest,
+) -> Result<(), BridgeError> {
+    if request.sender.sender_type != DispatchSenderType::Agent {
+        return Ok(());
+    }
+    let sender = request.sender.agent_id.as_deref().unwrap_or_default();
+    if request.targets.iter().all(|target| target == sender) {
+        return Ok(());
+    }
+    // Only Code Bot traffic is guarded. Other agents' hand-offs (e.g. a
+    // multi-agent pipeline drawn on agent-canvas) keep their existing
+    // behaviour and are neither counted nor paused.
+    if !gt_agent::is_code_bot_traffic(Some(sender), &request.targets) {
+        return Ok(());
+    }
+    match state
+        .collaboration_guard
+        .admit_agent_dispatch(&request.workspace_id)
+    {
+        Ok(snapshot) => {
+            let _ = app.emit("code_bot/collaboration_guard", &snapshot);
+            Ok(())
+        }
+        Err(denied) => {
+            tracing::info!(
+                workspace_id = %request.workspace_id,
+                sender = %sender,
+                code = denied.code,
+                "agent dispatch refused by collaboration guard"
+            );
+            let _ = app.emit(
+                "code_bot/collaboration_guard",
+                &state.collaboration_guard.snapshot(&request.workspace_id),
+            );
+            Err(BridgeError::new(denied.code, denied.message))
+        }
     }
 }
 
@@ -816,6 +868,10 @@ fn dispatch_batch(app: &AppHandle, state: &AppState, params: Value) -> Result<Va
             output_directories.insert(agent.id.clone(), output_dir.to_string_lossy().into_owned());
         }
     }
+
+    // Counted last, after every check that can fail, so a dispatch rejected
+    // for another reason doesn't use up the hand-off budget.
+    admit_agent_dispatch_through_guard(app, state, &request)?;
 
     let outcome = state.task_service.dispatch_batch_with_output_directories(
         &request,

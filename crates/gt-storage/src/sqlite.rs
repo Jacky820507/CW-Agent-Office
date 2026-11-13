@@ -10,6 +10,8 @@ pub enum StorageError {
     Io { message: String },
     #[error("storage connection error: {message}")]
     Connection { message: String },
+    #[error("invalid storage input: {message}")]
+    InvalidInput { message: String },
 }
 
 impl From<std::io::Error> for StorageError {

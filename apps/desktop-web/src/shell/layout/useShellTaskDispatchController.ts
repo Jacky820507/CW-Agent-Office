@@ -24,7 +24,7 @@ import {
   describeError,
   normalizeStationToolKind,
 } from './ShellRoot.shared'
-import { desktopApi } from '../integration/desktop-api'
+import { desktopApi, type TaskDispatchBatchResponse } from '../integration/desktop-api'
 import { resolveStationRuntimeRegistrationCleanup } from '@features/terminal/runtime'
 
 interface UseShellTaskDispatchControllerInput {
@@ -66,6 +66,15 @@ export interface ShellTaskDispatchController {
   updateTaskDraft: (patch: Partial<TaskDraftState>) => void
   insertTaskSnippet: (snippet: import('@features/task-center').TaskMarkdownSnippet) => void
   dispatchTaskToAgent: () => Promise<void>
+  /** Human dispatch straight to stations, without the task-center draft or
+   * history — used by the Code Bot thread, which keeps its own record. */
+  dispatchTaskBatch: (input: {
+    workspaceId: string
+    title: string
+    markdown: string
+    targetStationIds: string[]
+    suppressOutputCollectionInstructions?: boolean
+  }) => Promise<TaskDispatchBatchResponse>
   retryTaskDispatch: (taskId: string) => Promise<void>
   handleTaskSend: () => void
   handleRetryDispatchTask: (taskId: string) => Promise<void>
@@ -311,6 +320,8 @@ export function useShellTaskDispatchController({
       title: string
       markdown: string
       targetStationIds: string[]
+      /** Overrides the task center's checkbox (Code Bot passes `false`). */
+      suppressOutputCollectionInstructions?: boolean
     }) => {
       const response = await desktopApi.taskDispatchBatch({
         workspaceId: input.workspaceId,
@@ -319,7 +330,8 @@ export function useShellTaskDispatchController({
         title: input.title,
         markdown: input.markdown,
         attachments: [],
-        suppressOutputCollectionInstructions: taskSuppressOutputCollection,
+        suppressOutputCollectionInstructions:
+          input.suppressOutputCollectionInstructions ?? taskSuppressOutputCollection,
       })
       const postSubmitResults = await Promise.all(
         response.results.map(async (result) => {
@@ -399,6 +411,7 @@ export function useShellTaskDispatchController({
     updateTaskDraft,
     insertTaskSnippet,
     dispatchTaskToAgent,
+    dispatchTaskBatch,
     retryTaskDispatch,
     handleTaskSend,
     handleRetryDispatchTask,

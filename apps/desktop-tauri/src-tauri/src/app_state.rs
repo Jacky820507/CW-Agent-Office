@@ -476,6 +476,8 @@ pub struct AppState {
     pub git_status_coordinator: GitStatusCoordinator,
     pub settings_service: JsonSettingsService,
     pub task_service: TaskService,
+    /// Code Bot loop guard for agent-to-agent hand-offs (docs/cw/22_Code_Bot規劃.md, P3).
+    pub collaboration_guard: Arc<gt_task::CollaborationGuard>,
     pub daemon_bridge: DaemonBridge,
     pub shutdown_token: CancellationToken,
     pub session_registry: SharedSessionRegistry,
@@ -504,6 +506,7 @@ impl Default for AppState {
             git_status_coordinator: GitStatusCoordinator::default(),
             settings_service,
             task_service,
+            collaboration_guard: Arc::new(gt_task::CollaborationGuard::default()),
             daemon_bridge: DaemonBridge::default(),
             shutdown_token: CancellationToken::new(),
             session_registry: SharedSessionRegistry(Self::init_session_registry()),

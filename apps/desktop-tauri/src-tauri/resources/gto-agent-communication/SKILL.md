@@ -80,7 +80,19 @@ gto wait task_123 --from manager --timeout-sec 120 --json
 5. Use `gto agent handover` when the work is ready to return.
 6. Use `gto inbox` or `gto thread` whenever you need to rebuild context from the task conversation history.
 
+## Code Bot Thread
+
+Tasks sent from the Code Bot pane end with a `## Code Bot reply` section that names a `cb-…` id and your own agent id as the target. When you finish (or need the user to decide something), post your answer exactly as that section shows — that is how the user sees it; they are not watching your terminal. The `cb-…` id is given to you, so using it is not inventing a task id.
+
+For a multi-line reply or one containing quotes, write it to a file and use `--detail-file <path>` instead of `--detail "<text>"` (and `--summary-file` instead of `--summary` for `gto agent handover`); this avoids shell quoting problems (PowerShell especially):
+
+```bash
+gto agent reply-status --task-id cb-abc --target-agent-id <your-agent-id> --detail-file reply.md --workspace-id <id> --json
+```
+
+If a hand-off to another agent fails with `AGENT_COLLAB_HOP_LIMIT` or `AGENT_COLLAB_PAUSED`, the user has capped or paused agent-to-agent delegation. Do not retry the hand-off; finish what you can yourself and report back in the Code Bot thread.
+
 ## Avoid
 
-- Do not invent a new `taskId`; only reuse the one returned by the original dispatch.
+- Do not invent a new `taskId`; only reuse the one returned by the original dispatch (or the `cb-…` id a Code Bot task gives you).
 - Do not treat plain terminal output as a reply unless `gto --wait` captured and returned it. Explicit CLI replies remain the preferred path for thread history.

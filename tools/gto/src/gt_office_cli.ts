@@ -491,6 +491,33 @@ function requireTextOption(argv: string[], name: string) {
   return value
 }
 
+/** `--<name>` text, or the contents of the file named by `--<name>-file`.
+ * The file form lets an agent post a multi-line reply with quotes in it
+ * without fighting its shell's quoting rules (notably PowerShell on
+ * Windows). The file wins when both are given. */
+function requireTextOrFileOption(argv: string[], name: string) {
+  const fileOption = `${name}-file`
+  const filePath = readStringOption(argv, fileOption)
+  if (filePath) {
+    let content: string
+    try {
+      content = fsSync.readFileSync(filePath, 'utf8')
+    } catch (error) {
+      throw new CliError('INVALID_ARGUMENT', `Cannot read ${fileOption} ${filePath}: ${String(error)}`)
+    }
+    const text = content.replace(/^﻿/, '').trimEnd()
+    if (!text) {
+      throw new CliError('INVALID_ARGUMENT', `${fileOption} ${filePath} is empty`)
+    }
+    return text
+  }
+  const value = readStringOption(argv, name)
+  if (!value) {
+    throw new CliError('MISSING_REQUIRED_OPTION', `Option ${name} or ${fileOption} is required`)
+  }
+  return value
+}
+
 function requireTaskId(argv: string[]) {
   return requireTextOption(argv, '--task-id')
 }
@@ -980,7 +1007,7 @@ async function handleAgentCommand(argv: string[], deps: CliDeps) {
         senderAgentId: readCurrentAgentId(normalizedArgv) ?? null,
         targetAgentIds: requireTargetAgentIds(normalizedArgv),
         taskId: requireTaskId(normalizedArgv),
-        detail: requireTextOption(normalizedArgv, '--detail'),
+        detail: requireTextOrFileOption(normalizedArgv, '--detail'),
       }),
     )
   }
@@ -992,7 +1019,7 @@ async function handleAgentCommand(argv: string[], deps: CliDeps) {
         senderAgentId: readCurrentAgentId(normalizedArgv) ?? null,
         targetAgentIds: requireTargetAgentIds(normalizedArgv),
         taskId: requireTaskId(normalizedArgv),
-        summary: requireTextOption(normalizedArgv, '--summary'),
+        summary: requireTextOrFileOption(normalizedArgv, '--summary'),
         blockers: readRepeatedOption(normalizedArgv, '--blocker'),
         nextSteps: readRepeatedOption(normalizedArgv, '--next-step'),
       }),

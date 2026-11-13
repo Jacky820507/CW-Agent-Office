@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { Readable, Writable } from 'node:stream'
 import test from 'node:test'
 
@@ -938,6 +941,90 @@ test('runCli fails agent reply-status when the target did not accept delivery', 
     code: 'CHANNEL_DELIVERY_FAILED',
     message: 'AGENT_OFFLINE',
   })
+})
+
+test('runCli reads agent reply-status detail from --detail-file', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gto-detail-'))
+  const file = path.join(dir, 'reply.md')
+  const detail = '已完成：\n- 改用 "npm ci"\n- it\'s `done`'
+  fs.writeFileSync(file, `﻿${detail}\n\n`, 'utf8')
+  const published: unknown[] = []
+  const writes: string[] = []
+  try {
+    const exitCode = await runCli(
+      ['agent', 'reply-status', '--workspace-id', 'ws-1', '--target-agent-id', 'manager', '--task-id', 'cb-1', '--detail-file', file, '--json'],
+      {
+        stdout: {
+          write(chunk: string) {
+            writes.push(chunk)
+          },
+        },
+        createTaskBackend() {
+          return {
+            dispatchBatch: async () => ({ batchId: 'batch-1', results: [] }),
+            publish: async (request: unknown) => {
+              published.push(request)
+              return { messageId: 'msg-1', acceptedTargets: ['manager'], failedTargets: [] }
+            },
+            listThreads: async () => ({ threads: [] }),
+            getThread: async () => ({ thread: null }),
+          }
+        },
+      },
+    )
+    assert.equal(exitCode, 0)
+    // BOM and trailing blank lines are dropped; quotes and newlines survive.
+    assert.deepEqual((published[0] as { payload: { detail: string } }).payload.detail, detail)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('runCli reads agent handover summary from --summary-file', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gto-summary-'))
+  const file = path.join(dir, 'summary.md')
+  const summary = 'Review done:\n- "CI badge" fixed'
+  fs.writeFileSync(file, summary, 'utf8')
+  const published: unknown[] = []
+  try {
+    const exitCode = await runCli(
+      ['agent', 'handover', '--workspace-id', 'ws-1', '--target-agent-id', 'manager', '--task-id', 'task-1', '--summary-file', file, '--json'],
+      {
+        stdout: { write() {} },
+        createTaskBackend() {
+          return {
+            dispatchBatch: async () => ({ batchId: 'batch-1', results: [] }),
+            publish: async (request: unknown) => {
+              published.push(request)
+              return { messageId: 'msg-1', acceptedTargets: ['manager'], failedTargets: [] }
+            },
+            listThreads: async () => ({ threads: [] }),
+            getThread: async () => ({ thread: null }),
+          }
+        },
+      },
+    )
+    assert.equal(exitCode, 0)
+    assert.equal((published[0] as { payload: { summary: string } }).payload.summary, summary)
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('runCli reports an unreadable --detail-file clearly', async () => {
+  const writes: string[] = []
+  const exitCode = await runCli(
+    ['agent', 'reply-status', '--workspace-id', 'ws-1', '--target-agent-id', 'manager', '--task-id', 'cb-1', '--detail-file', path.join(os.tmpdir(), 'gto-missing-detail-file.md'), '--json'],
+    {
+      stdout: {
+        write(chunk: string) {
+          writes.push(chunk)
+        },
+      },
+    },
+  )
+  assert.equal(exitCode, 1)
+  assert.match(writes.join(''), /INVALID_ARGUMENT/)
 })
 
 test('runCli fails agent handover when the target did not accept delivery', async () => {

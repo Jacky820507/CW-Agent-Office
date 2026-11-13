@@ -11,12 +11,13 @@ mod local_bridge;
 mod native_window;
 mod process_utils;
 mod startup_services;
+mod system_metrics;
 mod terminal_debug;
 
 use base64::Engine;
 use commands::{
-    agent, agent_canvas, agentic_one, business_designer, file_explorer, git, keybindings, security,
-    session, settings, system, task_center, terminal, tool_adapter, workspace,
+    agent, agent_canvas, agentic_one, business_designer, code_bot, file_explorer, git, keybindings,
+    security, session, settings, system, task_center, terminal, tool_adapter, workspace,
 };
 use gt_terminal::TerminalRuntimeEvent;
 use rustls::crypto::aws_lc_rs;
@@ -252,6 +253,12 @@ pub fn run() {
             agent_canvas::agent_canvas_set_link_color,
             agent_canvas::agent_canvas_set_link_bidirectional,
             agent_canvas::agent_canvas_delete_derived_link,
+            code_bot::code_bot_ensure_team,
+            code_bot::code_bot_collaboration_state,
+            code_bot::code_bot_set_collaboration_paused,
+            code_bot::code_bot_set_hop_limit,
+            code_bot::code_bot_thread_load,
+            code_bot::code_bot_thread_save,
             agentic_one::agent_install_status,
             agentic_one::install_agent,
             agentic_one::uninstall_agent,
@@ -395,6 +402,7 @@ pub fn run() {
             keybindings::keymap_list,
             keybindings::keymap_update_binding,
             keybindings::keymap_reset,
+            system::system_metrics_snapshot,
             system::system_gto_cli_status,
             system::system_gto_cli_install,
             system::system_gto_cli_uninstall,

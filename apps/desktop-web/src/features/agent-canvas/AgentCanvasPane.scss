@@ -120,6 +120,82 @@
   }
 }
 
+// Code Bot team setup (docs/cw/22_Code_Bot規劃.md, P1): a labeled button
+// left of the help button, plus a larger call-to-action in the empty state,
+// since "no agents yet" is exactly when a one-click team is most useful.
+.agent-canvas-codebot-button,
+.agent-canvas-codebot-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: #{rem(6)};
+  border-radius: #{rem(8)};
+  font: inherit;
+  cursor: default;
+
+  svg {
+    width: #{rem(14)};
+    height: #{rem(14)};
+  }
+
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+.agent-canvas-codebot-button {
+  position: absolute;
+  top: #{rem(12)};
+  right: #{rem(48)};
+  z-index: 3;
+  height: #{rem(28)};
+  padding: 0 #{rem(10)};
+  border: var(--vb-border-width) solid var(--vb-border);
+  background: var(--vb-surface);
+  color: var(--vb-text);
+  font-size: #{rem(12)};
+  box-shadow: 0 #{rem(6)} #{rem(18)} rgba(0, 0, 0, 0.14);
+
+  &:hover:not(:disabled) {
+    color: var(--vb-accent);
+    border-color: var(--vb-accent);
+  }
+}
+
+.agent-canvas-codebot-cta {
+  margin-top: #{rem(8)};
+  padding: #{rem(8)} #{rem(16)};
+  border: none;
+  background: var(--vb-accent);
+  color: #fff;
+  font-size: #{rem(13)};
+  font-weight: 600;
+  pointer-events: auto;
+
+  &:hover:not(:disabled) {
+    background: var(--vb-accent-hover, var(--vb-accent));
+  }
+}
+
+.agent-canvas-codebot-hint {
+  max-width: #{rem(360)};
+  margin: 0;
+  font-size: #{rem(12)};
+}
+
+.agent-canvas-codebot-status {
+  position: absolute;
+  top: #{rem(48)};
+  right: #{rem(12)};
+  z-index: 3;
+  padding: #{rem(6)} #{rem(10)};
+  border-radius: #{rem(8)};
+  border: var(--vb-border-width) solid var(--vb-accent);
+  background: var(--vb-surface);
+  color: var(--vb-text);
+  font-size: #{rem(12)};
+  box-shadow: 0 #{rem(6)} #{rem(18)} rgba(0, 0, 0, 0.14);
+}
+
 .agent-canvas-help-backdrop {
   position: fixed;
   inset: 0;

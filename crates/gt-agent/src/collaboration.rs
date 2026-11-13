@@ -51,7 +51,7 @@ pub fn build_collaboration_context(
         .join("; ");
 
     Some(format!(
-        "[GT Office collaboration context] You are {agent_id} in workspace {workspace_id}. Connected collaborators: {connected}. When a task has a meaningful, separable part suited to a connected collaborator, delegate it proactively with: gto agent send-task --target-agent-id <agent-id> --title <title> --markdown <markdown> --json. Do not delegate trivial work. Keep the returned taskId for status and handover follow-ups. Only the connected agents listed above are authorized collaboration targets."
+        "[GT Office collaboration context] You are {agent_id} in workspace {workspace_id}. Connected collaborators: {connected}. When a task has a meaningful, separable part suited to a connected collaborator, delegate it proactively with: gto agent send-task --target-agent-id <agent-id> --title <title> --markdown <markdown> --json. Do not delegate trivial work. If the user addresses a connected collaborator with @<name> or @<tool> (for example @codex or @claude), treat that as an explicit instruction to delegate that part to that collaborator. A collaborator's reply is not typed into your terminal: when you need its result before continuing, wait for it with gto wait <taskId> --json (or read gto inbox). Keep the returned taskId for status and handover follow-ups. Only the connected agents listed above are authorized collaboration targets."
     ))
 }
 
@@ -121,6 +121,16 @@ mod tests {
         assert!(context.contains("b — Builder; tool: codex"));
         assert!(!context.contains("missing"));
         assert!(!context.contains("Other"));
+    }
+
+    #[test]
+    fn explains_that_at_mentions_are_explicit_delegation_requests() {
+        let agents = vec![agent("ws", "a", "Alpha"), agent("ws", "b", "Builder")];
+        let links = vec![link("ws", "a", "b", AgentLinkKind::Authored)];
+        let context = build_collaboration_context("ws", "a", &agents, &links).expect("context");
+        assert!(context.contains("@codex"));
+        assert!(context.contains("explicit instruction to delegate"));
+        assert!(context.contains("gto wait <taskId>"));
     }
 
     #[test]

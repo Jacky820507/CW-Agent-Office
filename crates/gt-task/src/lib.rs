@@ -12,7 +12,10 @@ use std::{
 };
 use tracing::{debug, warn};
 
+mod collaboration_guard;
 mod runtime_activity;
+
+pub use collaboration_guard::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
@@ -1843,7 +1846,7 @@ fn build_managed_agent_reply_instruction(
         .filter(|value| !value.is_empty())?;
 
     Some(format!(
-        "## GT Office Reply\n\nDo not reply only inside your own terminal.\n\nIf you need to reply to the original sender, use `gto` directly:\n- `gto agent reply-status --task-id {task_id} --target-agent-id {sender_agent_id} --detail \\\"<your reply text>\\\" --workspace-id {workspace_id} --json`\n\nIf you need to return a completion summary, blockers, or next steps, use:\n- `gto agent handover --task-id {task_id} --target-agent-id {sender_agent_id} --summary \\\"<summary>\\\" --workspace-id {workspace_id} --json`\n",
+        "## GT Office Reply\n\nDo not reply only inside your own terminal.\n\nIf you need to reply to the original sender, use `gto` directly:\n- `gto agent reply-status --task-id {task_id} --target-agent-id {sender_agent_id} --detail \\\"<your reply text>\\\" --workspace-id {workspace_id} --json`\n\nIf you need to return a completion summary, blockers, or next steps, use:\n- `gto agent handover --task-id {task_id} --target-agent-id {sender_agent_id} --summary \\\"<summary>\\\" --workspace-id {workspace_id} --json`\n\nFor multi-line text or text containing quotes, write it to a file and pass `--detail-file <path>` (or `--summary-file <path>`) instead, so your shell's quoting cannot mangle it.\n",
         workspace_id = request.workspace_id,
         sender_agent_id = sender_agent_id,
         task_id = task_id,

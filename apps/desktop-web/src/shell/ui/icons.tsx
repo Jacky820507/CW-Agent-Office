@@ -11,6 +11,7 @@ import {
   AlignVerticalDistributeCenter,
   Archive,
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   Check,
   CheckCircle2,
@@ -50,11 +51,13 @@ import {
   Maximize,
   Maximize2,
   MessageCircle,
+  MessagesSquare,
   Minimize,
   Minimize2,
   Minus,
   MoreHorizontal,
   Pencil,
+  Play,
   Pin,
   PinOff,
   Plus,
@@ -66,6 +69,7 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
+  Square,
   SquareTerminal,
   Route,
   Trash2,
@@ -153,6 +157,11 @@ export type AppIconName =
   | 'distribute-horizontal'
   | 'distribute-vertical'
   | 'help-circle'
+  | 'play'
+  | 'send'
+  | 'arrow-right'
+  | 'code-bot'
+  | 'stop'
 
 const iconMap: Record<AppIconName, LucideIcon> = {
   stations: LayoutGrid,
@@ -231,6 +240,11 @@ const iconMap: Record<AppIconName, LucideIcon> = {
   'distribute-horizontal': AlignHorizontalDistributeCenter,
   'distribute-vertical': AlignVerticalDistributeCenter,
   'help-circle': HelpCircle,
+  play: Play,
+  send: Send,
+  'arrow-right': ArrowRight,
+  'code-bot': MessagesSquare,
+  stop: Square,
 }
 
 interface AppIconProps extends SVGProps<SVGSVGElement> {

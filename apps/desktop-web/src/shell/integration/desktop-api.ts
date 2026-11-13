@@ -1820,6 +1820,8 @@ export interface GtoCliStatus {
 
 export interface GtoSkillStatus {
   installed: boolean
+  /** GT Office-managed copy that differs from the bundled skill (reinstall to update). */
+  outdated?: boolean
   managed: boolean
   targetDir?: string | null
   sourceDir?: string | null
@@ -1974,6 +1976,30 @@ export interface AgentRuntimeStatus {
   workspaceId: string
   state: AgentRuntimeState
   updatedAtMs: number
+}
+
+/** `system_metrics::SystemMetricsSnapshot` (apps/desktop-tauri/src-tauri/src/system_metrics.rs).
+ * Null means the platform cannot report that value. */
+export interface SystemMetricsSnapshot {
+  cpuPercent: number | null
+  memoryUsedBytes: number | null
+  memoryTotalBytes: number | null
+  gpu: {
+    name: string
+    utilizationPercent: number | null
+    memoryUsedBytes: number | null
+    memoryTotalBytes: number | null
+    temperatureC: number | null
+  } | null
+}
+
+/** `gt_task::CollaborationGuardSnapshot` (crates/gt-task/src/collaboration_guard.rs). */
+export interface CodeBotCollaborationGuardSnapshot {
+  workspaceId: string
+  paused: boolean
+  agentHops: number
+  hopLimit: number
+  hopLimitReached: boolean
 }
 
 export interface AgentCanvasRuntimeStatusResponse {
@@ -4750,6 +4776,63 @@ export const desktopApi = {
       fromAgentId,
       toAgentId,
     })
+  },
+  /** Idempotently creates the workspace's Claude + Codex Code Bot pair and
+   * the connection between them (docs/cw/22_Code_Bot規劃.md, P1). */
+  codeBotEnsureTeam(workspaceId: string) {
+    return invokeCommand<{ claudeAgentId: string; codexAgentId: string; createdAgentIds: string[] }>(
+      'code_bot_ensure_team',
+      { workspaceId },
+    )
+  },
+  /** Saved Code Bot thread (P5). Lists are null when nothing was saved yet;
+   * items are unvalidated JSON — the caller filters them. */
+  codeBotThreadLoad(workspaceId: string) {
+    return invokeCommand<{
+      humanItems: unknown[] | null
+      agentItems: unknown[] | null
+      clearedAtMs: number
+      updatedAtMs: number
+    }>('code_bot_thread_load', { workspaceId })
+  },
+  codeBotThreadSave(workspaceId: string, humanItems: unknown[], agentItems: unknown[], clearedAtMs: number) {
+    return invokeCommand<{ updatedAtMs: number }>('code_bot_thread_save', {
+      workspaceId,
+      humanItems,
+      agentItems,
+      clearedAtMs,
+    })
+  },
+  /** Host CPU / memory / GPU for the Code Bot dashboard (P4). */
+  systemMetricsSnapshot() {
+    return invokeCommand<SystemMetricsSnapshot>('system_metrics_snapshot', {})
+  },
+  /** Code Bot loop-guard state (docs/cw/22_Code_Bot規劃.md, P3). */
+  codeBotCollaborationState(workspaceId: string) {
+    return invokeCommand<CodeBotCollaborationGuardSnapshot>('code_bot_collaboration_state', { workspaceId })
+  },
+  /** Sets the workspace's agent hand-off limit (backend clamps to 1–20). */
+  codeBotSetHopLimit(workspaceId: string, limit: number) {
+    return invokeCommand<CodeBotCollaborationGuardSnapshot>('code_bot_set_hop_limit', { workspaceId, limit })
+  },
+  codeBotSetCollaborationPaused(workspaceId: string, paused: boolean) {
+    return invokeCommand<CodeBotCollaborationGuardSnapshot>('code_bot_set_collaboration_paused', {
+      workspaceId,
+      paused,
+    })
+  },
+  /** Fires whenever an agent hand-off is counted or refused, a user message
+   * resets the count, or collaboration is paused/resumed. */
+  async subscribeCodeBotCollaborationGuard(
+    onSnapshot: (snapshot: CodeBotCollaborationGuardSnapshot) => void,
+  ): Promise<() => void> {
+    if (!isTauriRuntime()) {
+      return () => {}
+    }
+    const eventApi = await import('@tauri-apps/api/event')
+    return eventApi.listen<CodeBotCollaborationGuardSnapshot>('code_bot/collaboration_guard', (event) =>
+      onSnapshot(event.payload),
+    )
   },
   agentCanvasDeleteDerivedLink(workspaceId: string, fromAgentId: string, toAgentId: string) {
     return invokeCommand<{ deleted: boolean }>('agent_canvas_delete_derived_link', {
