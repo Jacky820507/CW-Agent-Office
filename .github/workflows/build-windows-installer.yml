@@ -1,0 +1,54 @@
+name: build-windows-installer
+
+# Manual, Windows-only build that uploads the installer as a workflow artifact.
+# Unlike `release`, it publishes nothing and needs no tag or signing keys, so
+# a branch can be built and downloaded without Rust or Visual Studio locally.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Ensure skill resources exist
+        shell: bash
+        run: mkdir -p .codex/skills/gto-agent-communication/agents
+
+      - name: Prepare Windows ConPTY resources
+        run: node scripts/ensure-windows-conpty.cjs
+
+      - name: Rust check
+        run: cargo check --workspace
+
+      - name: Build installer
+        shell: bash
+        env:
+          CARGO_TERM_COLOR: always
+          NODE_OPTIONS: '--max-old-space-size=4096'
+        run: node scripts/run-tauri-with-env.cjs build --bundles nsis
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: CW-Agent-Office-windows-installer
+          path: '**/bundle/nsis/*.exe'
+          if-no-files-found: error
+          retention-days: 14
